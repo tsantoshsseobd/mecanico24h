@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mecânico 24h — Painel de Diagnóstico</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap');
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+  :root{--bg:#0B0F19;--bg2:#111827;--bg3:#1A2235;--border:#1E2D45;--green:#10B981;--green2:#059669;--yellow:#F59E0B;--red:#EF4444;--blue:#3B82F6;--white:#F1F5F9;--gray:#64748B;--mono:'JetBrains Mono',monospace;--sans:'Inter',sans-serif}
+  body{font-family:var(--sans);background:var(--bg);color:var(--white);min-height:100vh}
+  .header{background:var(--bg2);border-bottom:1px solid var(--border);padding:16px 32px;display:flex;align-items:center;justify-content:space-between}
+  .logo{font-family:var(--mono);font-size:18px;font-weight:600;color:var(--green);display:flex;align-items:center;gap:10px}
+  .logo-dot{width:8px;height:8px;background:var(--green);border-radius:50%;animation:blink 2s infinite}
+  @keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+  .header-right{display:flex;align-items:center;gap:12px;font-size:12px;color:var(--gray)}
+  .status-pill{display:flex;align-items:center;gap:6px;background:rgba(16,185,129,.1);border:1px solid rgba(16,185,129,.25);color:var(--green);font-size:11px;font-weight:600;padding:4px 12px;border-radius:20px}
+  .layout{display:grid;grid-template-columns:300px 1fr;min-height:calc(100vh - 61px)}
+  .sidebar{background:var(--bg2);border-right:1px solid var(--border);padding:24px;display:flex;flex-direction:column;gap:20px;overflow-y:auto}
+  .sidebar-section-title{font-size:10px;font-weight:700;letter-spacing:.15em;text-transform:uppercase;color:var(--gray);margin-bottom:8px}
+  .input-group{display:flex;flex-direction:column;gap:6px}
+  .input-label{font-size:12px;font-weight:500;color:var(--gray)}
+  .input-field{background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:10px 12px;font-family:var(--mono);font-size:12px;color:var(--white);width:100%;transition:border-color .2s}
+  .input-field:focus{outline:none;border-color:var(--green)}
+  .input-field::placeholder{color:var(--gray)}
+  .btn-analyze{width:100%;background:linear-gradient(135deg,var(--green),var(--green2));color:#000;font-family:var(--sans);font-size:14px;font-weight:700;padding:14px;border-radius:10px;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;transition:transform .2s,box-shadow .2s;box-shadow:0 4px 20px rgba(16,185,129,.25)}
+  .btn-analyze:hover:not(:disabled){transform:translateY(-1px);box-shadow:0 6px 28px rgba(16,185,129,.4)}
+  .btn-analyze:disabled{opacity:.5;cursor:not-allowed}
+  .btn-clear{width:100%;background:transparent;color:var(--gray);font-size:12px;font-weight:500;padding:10px;border-radius:8px;border:1px solid var(--border);cursor:pointer;transition:color .2s,border-color .2s}
+  .btn-clear:hover{color:var(--white);border-color:var(--gray)}
+  .info-box{background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:14px;font-size:12px;color:var(--gray);line-height:1.6}
+  .info-box strong{color:var(--white);display:block;margin-bottom:6px}
+  .main{padding:28px 32px;overflow-y:auto}
+  .empty-state{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:16px;text-align:center;padding:60px}
+  .empty-icon{font-size:56px;opacity:.4}
+  .empty-title{font-size:20px;font-weight:600;color:var(--white);opacity:.6}
+  .empty-sub{font-size:14px;color:var(--gray);max-width:360px;line-height:1.6}
+  .loading-state{display:none;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:20px;text-align:center}
+  .loading-spinner{width:48px;height:48px;border:3px solid var(--border);border-top-color:var(--green);border-radius:50%;animation:spin 1s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .loading-text{font-size:16px;font-weight:500;color:var(--white)}
+  .loading-sub{font-size:13px;color:var(--gray)}
+  .results{display:none;flex-direction:column;gap:20px}
+  .stats-bar{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:4px}
+  .stat-chip{display:flex;align-items:center;gap:6px;padding:6px 14px;border-radius:20px;font-size:12px;font-weight:600}
+  .stat-chip.total{background:rgba(59,130,246,.1);border:1px solid rgba(59,130,246,.25);color:var(--blue)}
+  .stat-chip.ok{background:rgba(16,185,129,.1);border:1px solid rgba(16,185,129,.25);color:var(--green)}
+  .stat-chip.warn{background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.25);color:var(--yellow)}
+  .stat-chip.crit{background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.25);color:var(--red)}
+  .vehicle-card{background:var(--bg2);border:1px solid var(--border);border-radius:14px;overflow:hidden;margin-bottom:16px;transition:border-color .2s}
+  .vehicle-card.status-ok{border-left:4px solid var(--green)}
+  .vehicle-card.status-warn{border-left:4px solid var(--yellow)}
+  .vehicle-card.status-crit{border-left:4px solid var(--red)}
+  .card-header{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--border)}
+  .card-header-left{display:flex;align-items:center;gap:12px}
+  .vehicle-icon{width:40px;height:40px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0}
+  .vehicle-icon.ok{background:rgba(16,185,129,.1)}
+  .vehicle-icon.warn{background:rgba(245,158,11,.1)}
+  .vehicle-icon.crit{background:rgba(239,68,68,.1)}
+  .vehicle-plate{font-family:var(--mono);font-size:16px;font-weight:600;color:var(--white)}
+  .vehicle-meta{font-size:12px;color:var(--gray);margin-top:2px}
+  .status-badge{font-size:11px;font-weight:700;padding:4px 12px;border-radius:20px;text-transform:uppercase;letter-spacing:.08em}
+  .status-badge.ok{background:rgba(16,185,129,.15);color:var(--green)}
+  .status-badge.warn{background:rgba(245,158,11,.15);color:var(--yellow)}
+  .status-badge.crit{background:rgba(239,68,68,.15);color:var(--red)}
+  .metrics-row{display:flex;gap:0;border-bottom:1px solid var(--border)}
+  .metric{flex:1;padding:12px 16px;border-right:1px solid var(--border);text-align:center}
+  .metric:last-child{border-right:none}
+  .metric-val{font-family:var(--mono);font-size:16px;font-weight:600;color:var(--white);line-height:1;margin-bottom:3px}
+  .metric-val.ok{color:var(--green)}
+  .metric-val.warn{color:var(--yellow)}
+  .metric-val.crit{color:var(--red)}
+  .metric-lbl{font-size:10px;color:var(--gray);text-transform:uppercase;letter-spacing:.08em}
+  .diagnosis{padding:16px 20px;font-size:14px;color:#94A3B8;line-height:1.7}
+  .whatsapp-section{border-top:1px solid var(--border);padding:14px 20px;background:rgba(0,0,0,.2)}
+  .whatsapp-label{font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--gray);margin-bottom:8px}
+  .whatsapp-msg{background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:12px 14px;font-size:13px;color:var(--white);line-height:1.6;white-space:pre-wrap}
+  .btn-copy{margin-top:8px;background:transparent;border:1px solid var(--border);color:var(--gray);font-size:12px;font-weight:500;padding:6px 16px;border-radius:6px;cursor:pointer;display:flex;align-items:center;gap:6px;transition:all .2s}
+  .btn-copy:hover{border-color:var(--green);color:var(--green)}
+  .btn-copy.copied{border-color:var(--green);color:var(--green)}
+  @media(max-width:768px){.layout{grid-template-columns:1fr}.sidebar{border-right:none;border-bottom:1px solid var(--border)}.main{padding:20px}.metrics-row{flex-wrap:wrap}.metric{min-width:50%}}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="logo">
+    <div class="logo-dot"></div>
+    🔧 Mecânico 24h — Painel IA
+  </div>
+  <div class="header-right">
+    <div class="status-pill">
+      <div class="logo-dot"></div>
+      Gemini + Google Sheets
+    </div>
+    <span id="lastUpdate">Nenhuma análise ainda</span>
+  </div>
+</div>
+
+<div class="layout">
+  <div class="sidebar">
+
+    <div>
+      <div class="sidebar-section-title">Configuração</div>
+      <div class="input-group">
+        <label class="input-label">🔑 Chave API Gemini</label>
+        <input type="password" class="input-field" id="apiKey" placeholder="AIza..."/>
+      </div>
+    </div>
+
+    <div class="info-box">
+      <strong>📊 Planilha conectada</strong>
+      Gerenciamento OBD2 de veículos<br>
+      <span style="color:var(--green);font-family:var(--mono);font-size:10px;">✓ ID configurado automaticamente</span>
+    </div>
+
+    <button class="btn-analyze" id="btnAnalyze" onclick="analyzeVehicles()">
+      🤖 Buscar dados e analisar
+    </button>
+
+    <button class="btn-clear" onclick="clearAll()">Limpar resultados</button>
+
+    <div class="info-box">
+      <strong>ℹ️ Como funciona</strong>
+      1. Cole sua chave Gemini<br>
+      2. Clique em "Buscar dados e analisar"<br>
+      3. O painel lê sua planilha automaticamente<br>
+      4. IA gera diagnóstico de cada veículo<br>
+      5. Copie a mensagem e envie no WhatsApp
+    </div>
+
+  </div>
+
+  <div class="main" id="mainArea">
+    <div class="empty-state" id="emptyState">
+      <div class="empty-icon">🚗</div>
+      <div class="empty-title">Pronto para analisar</div>
+      <div class="empty-sub">Cole sua chave API Gemini e clique em "Buscar dados e analisar". O painel lê sua planilha automaticamente e gera o diagnóstico de todos os veículos.</div>
+    </div>
+    <div class="loading-state" id="loadingState">
+      <div class="loading-spinner"></div>
+      <div class="loading-text">Analisando veículos...</div>
+      <div class="loading-sub" id="loadingMsg">Buscando dados da planilha...</div>
+    </div>
+    <div class="results" id="resultsArea">
+      <div class="stats-bar" id="statsBar"></div>
+      <div id="cardsContainer"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+const SHEET_ID = '1tCVgI0XafFm6LLLOUKq64sxN__VRxbPrm3YRgVw6ojs';
+
+// Busca dados da planilha via API pública do Google Sheets
+async function fetchSheetData() {
+  const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&sheet=Sheet1`;
+  const res = await fetch(url);
+  const text = await res.text();
+  const json = JSON.parse(text.match(/google\.visualization\.Query\.setResponse\(([\s\S]*)\)/)[1]);
+
+  const rows = json.table.rows;
+  const vehicles = [];
+
+  for (const row of rows) {
+    const cells = row.c;
+    if (!cells || !cells[1]) continue;
+
+    const getValue = (i) => cells[i] && cells[i].v !== null ? String(cells[i].v) : '--';
+
+    vehicles.push({
+      data: getValue(0),
+      placa: getValue(1),
+      rpm: getValue(2),
+      temp: getValue(3),
+      bateria: getValue(4),
+      veloc: getValue(5),
+      km: getValue(6),
+      erros: getValue(7) || 'Nenhum'
+    });
+  }
+
+  return vehicles;
+}
+
+// Agrupar por placa — pega a leitura mais recente de cada carro
+function groupByPlate(vehicles) {
+  const map = {};
+  for (const v of vehicles) {
+    map[v.placa] = v; // sobrescreve — fica com a última leitura
+  }
+  return Object.values(map);
+}
+
+async function callGemini(apiKey, prompt) {
+  const res = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: { temperature: 0.3, maxOutputTokens: 4096 }
+      })
+    }
+  );
+  if (!res.ok) {
+    const err = await res.json();
+    throw new Error(err.error?.message || 'Erro na API Gemini');
+  }
+  const data = await res.json();
+  return data.candidates[0].content.parts[0].text;
+}
+
+function buildPrompt(vehicles) {
+  const lista = vehicles.map(v =>
+    `Placa: ${v.placa} | RPM: ${v.rpm} | Temperatura: ${v.temp}°C | Bateria: ${v.bateria}V | KM: ${v.km} | Erros DTC: ${v.erros}`
+  ).join('\n');
+
+  return `Você é um mecânico especialista com 20 anos de experiência. Analise os dados OBD2 abaixo e retorne um JSON com o diagnóstico de cada veículo.
+
+DADOS:
+${lista}
+
+Retorne APENAS JSON válido, sem texto extra:
+{
+  "veiculos": [
+    {
+      "placa": "ABC-1D23",
+      "status": "ok" | "atencao" | "critico",
+      "resumo": "Uma frase resumindo a situação do veículo",
+      "problemas": [
+        {
+          "tipo": "critico" | "atencao" | "ok",
+          "titulo": "Nome do problema",
+          "descricao": "Explicação em português simples para leigo",
+          "custo_resolver": "R$ 150-280",
+          "custo_ignorar": "R$ 2.400",
+          "urgencia": "Imediato" | "30 dias" | "60 dias" | "Monitorar"
+        }
+      ],
+      "mensagem_whatsapp": "Mensagem amigável para enviar ao cliente no WhatsApp com emojis, explicando o diagnóstico em linguagem simples e as recomendações"
+    }
+  ]
+}
+
+Regras:
+- critico: bateria < 12.0V OU temperatura > 100°C OU erros DTC presentes
+- atencao: bateria 12.0-12.3V OU temperatura 95-100°C
+- ok: tudo normal
+- Sempre inclua pelo menos 1 item em problemas
+- Mensagem WhatsApp deve ser calorosa e de confiança`;
+}
+
+function renderCard(v, d) {
+  const sc = d.status === 'critico' ? 'crit' : d.status === 'atencao' ? 'warn' : 'ok';
+  const lbl = d.status === 'critico' ? '🔴 Crítico' : d.status === 'atencao' ? '🟡 Atenção' : '🟢 OK';
+  const icon = d.status === 'critico' ? '⚠️' : d.status === 'atencao' ? '🔔' : '✅';
+
+  const probs = (d.problemas || []).map(p => {
+    const cor = p.tipo === 'critico' ? '#EF4444' : p.tipo === 'atencao' ? '#F59E0B' : '#10B981';
+    return `<div style="border-left:3px solid ${cor};padding:10px 14px;margin:8px 0;background:rgba(0,0,0,.2);border-radius:0 8px 8px 0;">
+      <div style="font-size:13px;font-weight:600;color:#F1F5F9;margin-bottom:4px;">${p.titulo}</div>
+      <div style="font-size:12px;color:#94A3B8;line-height:1.5;margin-bottom:6px;">${p.descricao}</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        ${p.custo_resolver ? `<span style="font-size:11px;font-weight:600;padding:2px 8px;border-radius:4px;background:rgba(16,185,129,.1);color:#10B981;border:1px solid rgba(16,185,129,.2);">Resolver: ${p.custo_resolver}</span>` : ''}
+        ${p.custo_ignorar ? `<span style="font-size:11px;font-weight:600;padding:2px 8px;border-radius:4px;background:rgba(239,68,68,.1);color:#EF4444;border:1px solid rgba(239,68,68,.2);">Ignorar: ${p.custo_ignorar}</span>` : ''}
+        ${p.urgencia ? `<span style="font-size:11px;padding:2px 8px;border-radius:4px;background:rgba(100,116,139,.1);color:#94A3B8;border:1px solid rgba(100,116,139,.2);">${p.urgencia}</span>` : ''}
+      </div>
+    </div>`;
+  }).join('');
+
+  const tempN = parseFloat(v.temp) || 0;
+  const batN = parseFloat(v.bateria) || 0;
+  const tc = tempN > 100 ? 'crit' : tempN > 95 ? 'warn' : 'ok';
+  const bc = batN < 12.0 ? 'crit' : batN < 12.4 ? 'warn' : 'ok';
+  const ec = v.erros && v.erros !== 'Nenhum' && v.erros !== '--' ? 'crit' : 'ok';
+  const msgId = 'msg_' + (d.placa || v.placa).replace(/[^a-z0-9]/gi, '');
+
+  return `<div class="vehicle-card status-${sc}">
+    <div class="card-header">
+      <div class="card-header-left">
+        <div class="vehicle-icon ${sc}">${icon}</div>
+        <div>
+          <div class="vehicle-plate">${d.placa || v.placa}</div>
+          <div class="vehicle-meta">KM: ${parseInt(v.km || 0).toLocaleString('pt-BR')} · ${v.data}</div>
+        </div>
+      </div>
+      <div class="status-badge ${sc}">${lbl}</div>
+    </div>
+    <div class="metrics-row">
+      <div class="metric"><div class="metric-val ok">${v.rpm || '--'}</div><div class="metric-lbl">RPM</div></div>
+      <div class="metric"><div class="metric-val ${tc}">${v.temp ? v.temp + '°C' : '--'}</div><div class="metric-lbl">Temperatura</div></div>
+      <div class="metric"><div class="metric-val ${bc}">${v.bateria ? v.bateria + 'V' : '--'}</div><div class="metric-lbl">Bateria</div></div>
+      <div class="metric"><div class="metric-val ${ec}">${ec === 'crit' ? '⚠️' : '✓'}</div><div class="metric-lbl">Erros DTC</div></div>
+    </div>
+    <div class="diagnosis">
+      <div style="font-size:12px;font-weight:600;color:#64748B;text-transform:uppercase;letter-spacing:.1em;margin-bottom:10px;">Diagnóstico IA</div>
+      <div style="font-size:14px;font-weight:500;color:#F1F5F9;margin-bottom:12px;">${d.resumo || ''}</div>
+      ${probs}
+    </div>
+    <div class="whatsapp-section">
+      <div class="whatsapp-label">💬 Mensagem pronta para WhatsApp</div>
+      <div class="whatsapp-msg" id="${msgId}">${d.mensagem_whatsapp || ''}</div>
+      <button class="btn-copy" onclick="copyMsg('${msgId}',this)">📋 Copiar mensagem</button>
+    </div>
+  </div>`;
+}
+
+async function analyzeVehicles() {
+  const apiKey = document.getElementById('apiKey').value.trim();
+  if (!apiKey) { alert('Cole sua chave API Gemini!'); return; }
+
+  document.getElementById('emptyState').style.display = 'none';
+  document.getElementById('resultsArea').style.display = 'none';
+  document.getElementById('loadingState').style.display = 'flex';
+  document.getElementById('loadingMsg').textContent = 'Buscando dados da planilha...';
+  document.getElementById('btnAnalyze').disabled = true;
+
+  try {
+    // Busca planilha
+    document.getElementById('loadingMsg').textContent = 'Lendo Google Sheets...';
+    const allVehicles = await fetchSheetData();
+
+    if (allVehicles.length === 0) {
+      throw new Error('Nenhum dado encontrado na planilha. Verifique se há dados salvos.');
+    }
+
+    // Agrupa por placa — última leitura de cada carro
+    const vehicles = groupByPlate(allVehicles);
+    document.getElementById('loadingMsg').textContent = `${vehicles.length} veículo(s) encontrado(s). Analisando com Gemini...`;
+
+    // Chama Gemini
+    const prompt = buildPrompt(vehicles);
+    const response = await callGemini(apiKey, prompt);
+    const clean = response.replace(/```json|```/g, '').trim();
+    const result = JSON.parse(clean);
+    const diagnostics = result.veiculos || [];
+
+    // Stats
+    const total = diagnostics.length;
+    const ok = diagnostics.filter(d => d.status === 'ok').length;
+    const warn = diagnostics.filter(d => d.status === 'atencao').length;
+    const crit = diagnostics.filter(d => d.status === 'critico').length;
+
+    document.getElementById('statsBar').innerHTML = `
+      <div class="stat-chip total">🚗 ${total} veículos</div>
+      ${ok > 0 ? `<div class="stat-chip ok">✅ ${ok} OK</div>` : ''}
+      ${warn > 0 ? `<div class="stat-chip warn">⚠️ ${warn} Atenção</div>` : ''}
+      ${crit > 0 ? `<div class="stat-chip crit">🔴 ${crit} Crítico</div>` : ''}
+      <div class="stat-chip total" style="margin-left:auto;font-size:11px;">📋 ${allVehicles.length} leituras totais</div>
+    `;
+
+    document.getElementById('cardsContainer').innerHTML =
+      diagnostics.map((d, i) => renderCard(vehicles[i] || vehicles[0], d)).join('');
+
+    document.getElementById('loadingState').style.display = 'none';
+    document.getElementById('resultsArea').style.display = 'flex';
+    document.getElementById('lastUpdate').textContent = 'Atualizado às ' + new Date().toLocaleTimeString('pt-BR');
+
+  } catch (err) {
+    document.getElementById('loadingState').style.display = 'none';
+    document.getElementById('emptyState').style.display = 'flex';
+    document.getElementById('emptyState').innerHTML = `
+      <div class="empty-icon">❌</div>
+      <div class="empty-title">Erro na análise</div>
+      <div class="empty-sub">${err.message}<br><br>Verifique sua chave API e tente novamente.</div>
+    `;
+  }
+
+  document.getElementById('btnAnalyze').disabled = false;
+}
+
+function copyMsg(id, btn) {
+  const el = document.getElementById(id);
+  navigator.clipboard.writeText(el.textContent).then(() => {
+    btn.textContent = '✅ Copiado!';
+    btn.classList.add('copied');
+    setTimeout(() => { btn.innerHTML = '📋 Copiar mensagem'; btn.classList.remove('copied'); }, 2000);
+  });
+}
+
+function clearAll() {
+  document.getElementById('resultsArea').style.display = 'none';
+  document.getElementById('emptyState').style.display = 'flex';
+  document.getElementById('emptyState').innerHTML = `
+    <div class="empty-icon">🚗</div>
+    <div class="empty-title">Pronto para analisar</div>
+    <div class="empty-sub">Cole sua chave API Gemini e clique em "Buscar dados e analisar".</div>
+  `;
+  document.getElementById('lastUpdate').textContent = 'Nenhuma análise ainda';
+}
+
+window.onload = () => {
+  const saved = localStorage.getItem('gemini_key');
+  if (saved) document.getElementById('apiKey').value = saved;
+};
+
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('apiKey').addEventListener('input', function() {
+    localStorage.setItem('gemini_key', this.value);
+  });
+});
+</script>
+</body>
+</html>
